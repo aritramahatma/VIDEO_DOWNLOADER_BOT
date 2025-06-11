@@ -21,6 +21,13 @@ class VideoDownloader:
             'no_warnings': True,
             'extractaudio': False,
             'format': 'best',
+            'cookiefile': None,
+            'extract_flat': False,
+            'writesubtitles': False,
+            'writeautomaticsub': False,
+            'ignoreerrors': False,
+            'age_limit': None,
+            'max_filesize': 500 * 1024 * 1024,  # 500MB max
         }
         
     async def get_video_info(self, url: str) -> Optional[Dict[str, Any]]:
