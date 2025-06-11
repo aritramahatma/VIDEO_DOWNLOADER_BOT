@@ -160,23 +160,44 @@ Please respect copyright laws and platform terms of service when downloading vid
                 )
                 return
 
-            # Check if video has multiple formats
+            # Check if video has downloadable formats
             formats = video_info.get('formats', [])
-            if len(formats) > 1:
-                # Show quality selection
+            
+            # Filter for video formats only
+            video_formats = [f for f in formats if f.get('vcodec') != 'none' and f.get('url')]
+            
+            if not video_formats:
+                await status_message.edit_text(
+                    "❌ *Download Not Available*\n"
+                    "This video cannot be downloaded. It may be:\n"
+                    "• Private or restricted\n"
+                    "• Age-restricted content\n"
+                    "• Temporarily unavailable\n"
+                    "• From an unsupported platform feature\n\n"
+                    "Please try a different video.",
+                    parse_mode=ParseMode.MARKDOWN
+                )
+                return
+            
+            # Sort formats by quality (height)
+            video_formats.sort(key=lambda x: x.get('height', 0), reverse=True)
+            
+            # Check if we have multiple good quality options
+            good_formats = [f for f in video_formats if f.get('height', 0) >= 360]
+            
+            if len(good_formats) > 1:
+                # Show quality selection for high quality formats
                 keyboard = []
                 
-                # Filter and sort formats by quality
-                video_formats = [f for f in formats if f.get('vcodec') != 'none']
-                video_formats.sort(key=lambda x: x.get('height', 0), reverse=True)
-                
                 # Add quality options (limit to top 5)
-                for i, fmt in enumerate(video_formats[:5]):
+                for i, fmt in enumerate(good_formats[:5]):
                     height = fmt.get('height', 'Unknown')
                     ext = fmt.get('ext', 'mp4')
                     filesize = fmt.get('filesize')
                     
-                    quality_text = f"{height}p ({ext})"
+                    quality_text = f"{height}p"
+                    if ext != 'mp4':
+                        quality_text += f" ({ext})"
                     if filesize:
                         quality_text += f" - {format_file_size(filesize)}"
                     
@@ -201,7 +222,7 @@ Please respect copyright laws and platform terms of service when downloading vid
                 if duration:
                     info_text += f"⏱ Duration: {duration//60}:{duration%60:02d}\n"
                 info_text += f"👤 Uploader: {uploader}\n\n"
-                info_text += "Please select video quality:"
+                info_text += "Select video quality:"
 
                 await status_message.edit_text(
                     info_text,
@@ -213,7 +234,7 @@ Please respect copyright laws and platform terms of service when downloading vid
                 context.user_data[f"url_{update.message.message_id}"] = url
                 
             else:
-                # Download directly with best quality
+                # Download directly with best available quality
                 await self.download_and_send_video(
                     update, context, status_message, url, "best"
                 )

@@ -35,7 +35,15 @@ class VideoDownloader:
         try:
             def extract_info():
                 with yt_dlp.YoutubeDL(self.ydl_opts_info) as ydl:
-                    return ydl.extract_info(url, download=False)
+                    info = ydl.extract_info(url, download=False)
+                    # Filter and validate formats
+                    if info and 'formats' in info:
+                        valid_formats = []
+                        for fmt in info['formats']:
+                            if self._is_format_downloadable(fmt):
+                                valid_formats.append(fmt)
+                        info['formats'] = valid_formats
+                    return info
             
             # Run in thread pool to avoid blocking
             loop = asyncio.get_event_loop()
@@ -47,18 +55,56 @@ class VideoDownloader:
             logger.error(f"Error extracting video info: {str(e)}")
             return None
 
+    def _is_format_downloadable(self, fmt: dict) -> bool:
+        """Check if a format is actually downloadable."""
+        # Skip audio-only formats
+        if fmt.get('vcodec') == 'none':
+            return False
+        
+        # Skip formats without URL
+        if not fmt.get('url'):
+            return False
+        
+        # Skip formats that are marked as unavailable
+        format_note = fmt.get('format_note', '')
+        if format_note and 'unavailable' in str(format_note).lower():
+            return False
+        
+        # Skip very low quality formats (below 144p)
+        height = fmt.get('height', 0)
+        if height > 0 and height < 144:
+            return False
+        
+        # Skip corrupted or incomplete formats
+        if fmt.get('filesize') == 0:
+            return False
+            
+        return True
+
     async def download_video(self, url: str, output_dir: str, format_id: str = "best") -> Optional[str]:
         """Download video with specified format."""
         try:
             # Prepare output template
             output_template = os.path.join(output_dir, '%(title)s.%(ext)s')
             
-            # Configure yt-dlp options
+            # Configure yt-dlp options with better Instagram support
             ydl_opts = {
                 'format': format_id,
                 'outtmpl': output_template,
                 'quiet': True,
                 'no_warnings': True,
+                'extract_flat': False,
+                'writesubtitles': False,
+                'writeautomaticsub': False,
+                'ignoreerrors': False,
+                'retries': 3,
+                'fragment_retries': 3,
+                'http_chunk_size': 10485760,  # 10MB chunks
+                'max_filesize': 500 * 1024 * 1024,  # 500MB max
+                'postprocessors': [{
+                    'key': 'FFmpegVideoConvertor',
+                    'preferedformat': 'mp4',
+                }],
             }
             
             def download():
@@ -66,7 +112,7 @@ class VideoDownloader:
                     info = ydl.extract_info(url, download=True)
                     
                     # Get the actual filename
-                    if 'entries' in info:
+                    if info and isinstance(info, dict) and 'entries' in info and info['entries']:
                         # Playlist - get first video
                         video_info = info['entries'][0]
                     else:

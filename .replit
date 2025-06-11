@@ -16,20 +16,8 @@ author = "agent"
 task = "workflow.run"
 args = "Video Downloader Bot"
 
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "telegram_bot_test"
-
 [[workflows.workflow]]
 name = "Video Downloader Bot"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "pip install python-telegram-bot yt-dlp && python main.py"
-
-[[workflows.workflow]]
-name = "telegram_bot_test"
 author = "agent"
 
 [[workflows.workflow.tasks]]
